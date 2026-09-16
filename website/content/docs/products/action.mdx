@@ -73,6 +73,30 @@ Use annotation (`true` by default).
     annotations: false
 ```
 
+### `annotation-level`
+
+Minimum severity of inline annotations (`notice` by default).
+
+| Value     | Inline annotations                                  |
+| --------- | --------------------------------------------------- |
+| `notice`  | All changes (breaking, dangerous, and non-breaking) |
+| `warning` | Breaking and dangerous changes                      |
+| `failure` | Breaking changes only                               |
+
+To show only breaking changes inline:
+
+```yaml
+- uses: graphql-hive/graphql-inspector@master
+  with:
+    schema: 'master:schema.graphql'
+    annotation-level: failure
+```
+
+The level applies after any configured `rules`. It only filters inline annotations: the check
+summary and `changes` output still include all changes, and the check conclusion still respects
+`fail-on-breaking` and `approve-label`. Setting `annotations: false` disables all inline annotations
+regardless of the level. Invalid levels fail the action with a configuration error.
+
 ### `fail-on-breaking`
 
 Fail on breaking changes (`true` by default).

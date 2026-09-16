@@ -6,7 +6,7 @@ import { Rule } from '@graphql-inspector/core';
 import { diff } from '../helpers/diff.js';
 import { printSchemaFromEndpoint } from '../helpers/loaders.js';
 import { produceSchema } from '../helpers/schema.js';
-import { CheckConclusion } from '../helpers/types.js';
+import { AnnotationLevel, CheckConclusion } from '../helpers/types.js';
 import { createSummary } from '../helpers/utils.js';
 import { updateCheckRun } from './checks.js';
 import { fileLoader } from './files.js';
@@ -14,6 +14,12 @@ import { getAssociatedPullRequest, getCurrentCommitSha } from './git.js';
 import { castToBoolean, getInputAsArray, resolveRule } from './utils.js';
 
 const CHECK_NAME = 'GraphQL Inspector';
+
+const annotationSeverity = {
+  [AnnotationLevel.Notice]: 0,
+  [AnnotationLevel.Warning]: 1,
+  [AnnotationLevel.Failure]: 2,
+};
 
 export async function run() {
   core.info(`GraphQL Inspector started`);
@@ -36,6 +42,16 @@ export async function run() {
 
   const useMerge = castToBoolean(core.getInput('experimental_merge'), true);
   const useAnnotations = castToBoolean(core.getInput('annotations'));
+  const annotationLevel = core.getInput('annotation-level') || AnnotationLevel.Notice;
+
+  if (
+    annotationLevel !== AnnotationLevel.Notice &&
+    annotationLevel !== AnnotationLevel.Warning &&
+    annotationLevel !== AnnotationLevel.Failure
+  ) {
+    return core.setFailed('Invalid annotation-level. Expected one of: notice, warning, failure.');
+  }
+
   const failOnBreaking = castToBoolean(core.getInput('fail-on-breaking'));
   const endpoint: string = core.getInput('endpoint');
   const approveLabel: string = core.getInput('approve-label') || 'approved-breaking-change';
@@ -211,6 +227,11 @@ export async function run() {
   if (useAnnotations === false || isNewSchemaUrl) {
     core.info(`Anotations are disabled. Skipping annotations...`);
     annotations = [];
+  } else {
+    annotations = annotations.filter(
+      annotation =>
+        annotationSeverity[annotation.annotation_level] >= annotationSeverity[annotationLevel],
+    );
   }
 
   const summary = createSummary(changes, 100, false);

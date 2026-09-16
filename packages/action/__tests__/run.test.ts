@@ -21,6 +21,8 @@ describe('Inspector Action', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLoadFile.mockReset();
+    mockUpdateCheckRun.mockClear();
 
     // Mock error/warning/info/debug
     vi.spyOn(core, 'error').mockImplementation(vi.fn());
@@ -67,6 +69,122 @@ describe('Inspector Action', () => {
     mockFileLoader.mockReturnValue(mockLoadFile);
 
     process.env.GITHUB_WORKSPACE = '/workspace';
+  });
+
+  describe('annotation-level', () => {
+    function setInputs(inputs: Record<string, string>) {
+      vi.spyOn(core, 'getInput').mockImplementation(name => {
+        const values: Record<string, string> = {
+          'github-token': 'MOCK_GITHUB_TOKEN',
+          schema: 'master:schema.graphql',
+          ...inputs,
+        };
+        return values[name] || '';
+      });
+    }
+
+    beforeEach(() => {
+      vi.spyOn(core, 'setOutput').mockImplementation(vi.fn());
+      vi.spyOn(core, 'setFailed').mockImplementation(vi.fn());
+      mockLoadFile
+        .mockResolvedValueOnce(/* GraphQL */ `
+          type Query {
+            value: String
+            choice: Choice
+          }
+          enum Choice {
+            A
+          }
+        `)
+        .mockResolvedValueOnce(/* GraphQL */ `
+          type Query {
+            value: Int
+            choice: Choice
+            added: String
+          }
+          enum Choice {
+            A
+            B
+          }
+        `);
+    });
+
+    it.each([
+      { level: '', levels: ['failure', 'notice', 'warning'] },
+      { level: 'notice', levels: ['failure', 'notice', 'warning'] },
+      { level: 'warning', levels: ['failure', 'warning'] },
+      { level: 'failure', levels: ['failure'] },
+    ])('filters at "$level" without changing the summary or failure', async ({ level, levels }) => {
+      setInputs({ 'annotation-level': level });
+
+      await run();
+
+      const result = mockUpdateCheckRun.mock.calls[0][2];
+      expect(result.conclusion).toBe(CheckConclusion.Failure);
+      expect(result.output.annotations?.map(a => a.annotation_level).sort()).toEqual(levels);
+      expect(result.output.summary).toContain('Found 3 changes');
+      expect(result.output.summary).toContain('Breaking: 1');
+      expect(result.output.summary).toContain('Dangerous: 1');
+      expect(result.output.summary).toContain('Safe: 1');
+      expect(core.setOutput).toHaveBeenCalledWith('changes', '3');
+    });
+
+    it('disables all annotations when annotations is false', async () => {
+      setInputs({ 'annotation-level': 'failure', annotations: 'false' });
+
+      await run();
+
+      const result = mockUpdateCheckRun.mock.calls[0][2];
+      expect(result.output.annotations).toEqual([]);
+      expect(result.conclusion).toBe(CheckConclusion.Failure);
+      expect(result.output.summary).toContain('Found 3 changes');
+    });
+
+    it.each(['approve-label', 'fail-on-breaking'])('preserves the %s override', async override => {
+      setInputs({
+        'annotation-level': 'failure',
+        [override]: override === 'approve-label' ? 'expected-breaking-change' : 'false',
+      });
+      if (override === 'approve-label') {
+        mockGetAssociatedPullRequest.mockResolvedValue({
+          state: 'open',
+          number: 1,
+          labels: [{ name: 'expected-breaking-change' }],
+          base: { ref: 'master' },
+        });
+      }
+
+      await run();
+
+      const result = mockUpdateCheckRun.mock.calls[0][2];
+      expect(result.conclusion).toBe(CheckConclusion.Success);
+      expect(result.output.annotations?.map(a => a.annotation_level)).toEqual(['failure']);
+      expect(result.output.summary).toContain('Breaking: 1');
+    });
+
+    it('filters using the severity after applying rules', async () => {
+      setInputs({ 'annotation-level': 'failure', rules: 'example/rules/custom-rule.js' });
+
+      await run();
+
+      const result = mockUpdateCheckRun.mock.calls[0][2];
+      expect(result.output.annotations).toEqual([]);
+      expect(result.conclusion).toBe(CheckConclusion.Success);
+      expect(result.output.summary).toContain('Found 3 changes');
+      expect(core.setOutput).toHaveBeenCalledWith('changes', '3');
+    });
+
+    it('rejects invalid levels before creating a check', async () => {
+      setInputs({ 'annotation-level': 'error' });
+
+      await run();
+
+      expect(core.setFailed).toHaveBeenCalledWith(
+        'Invalid annotation-level. Expected one of: notice, warning, failure.',
+      );
+      expect(github.getOctokit).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+    });
   });
 
   describe('rules', () => {

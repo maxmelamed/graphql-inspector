@@ -12,6 +12,13 @@ inputs:
       For example, "Check Public API" and "Check Internal API".
   annotations:
     description: Use annotation (enabled by default)
+  annotation-level:
+    description: |
+      Minimum severity of inline annotations: notice (all changes), warning (dangerous and
+      breaking changes), or failure (breaking changes only). Does not affect the check summary
+      or conclusion. Setting annotations to false disables all inline annotations.
+    default: notice
+    required: false
   fail-on-breaking:
     description: Fail on breaking changes (enabled by default)
   approve-label:
