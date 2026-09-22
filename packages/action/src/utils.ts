@@ -2,6 +2,9 @@ import { existsSync } from 'fs';
 import * as core from '@actions/core';
 import { ensureAbsolute } from '@graphql-inspector/commands';
 import { DiffRule, Rule } from '@graphql-inspector/core';
+import { AnnotationFilterLevel } from '../helpers/types.js';
+
+const annotationFilterLevels: readonly string[] = Object.values(AnnotationFilterLevel);
 
 export function batch<T>(items: T[], limit: number): T[][] {
   const batches: T[][] = [];
@@ -39,6 +42,10 @@ export function castToBoolean(value: string | boolean, defaultValue?: boolean): 
   }
 
   return true;
+}
+
+export function isAnnotationFilterLevel(value: string): value is AnnotationFilterLevel {
+  return annotationFilterLevels.includes(value);
 }
 
 export function getInputAsArray(name: string, options?: core.InputOptions): string[] {

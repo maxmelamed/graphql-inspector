@@ -20,6 +20,12 @@ export interface Annotation {
   end_column?: number;
 }
 
+export enum AnnotationFilterLevel {
+  All = 'all',
+  Dangerous = 'dangerous',
+  Breaking = 'breaking',
+}
+
 export enum AnnotationLevel {
   Failure = 'failure',
   Warning = 'warning',

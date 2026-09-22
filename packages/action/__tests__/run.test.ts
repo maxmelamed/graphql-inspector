@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import { CheckConclusion } from '../helpers/types.js';
+import { AnnotationFilterLevel, CheckConclusion } from '../helpers/types.js';
 import { updateCheckRun } from '../src/checks.js';
 import { fileLoader } from '../src/files.js';
 import { getAssociatedPullRequest } from '../src/git.js';
@@ -111,9 +111,9 @@ describe('Inspector Action', () => {
 
     it.each([
       { level: '', levels: ['failure', 'notice', 'warning'] },
-      { level: 'notice', levels: ['failure', 'notice', 'warning'] },
-      { level: 'warning', levels: ['failure', 'warning'] },
-      { level: 'failure', levels: ['failure'] },
+      { level: AnnotationFilterLevel.All, levels: ['failure', 'notice', 'warning'] },
+      { level: AnnotationFilterLevel.Dangerous, levels: ['failure', 'warning'] },
+      { level: AnnotationFilterLevel.Breaking, levels: ['failure'] },
     ])('filters at "$level" without changing the summary or failure', async ({ level, levels }) => {
       setInputs({ 'annotation-level': level });
 
@@ -130,7 +130,7 @@ describe('Inspector Action', () => {
     });
 
     it('disables all annotations when annotations is false', async () => {
-      setInputs({ 'annotation-level': 'failure', annotations: 'false' });
+      setInputs({ 'annotation-level': AnnotationFilterLevel.Breaking, annotations: 'false' });
 
       await run();
 
@@ -142,7 +142,7 @@ describe('Inspector Action', () => {
 
     it.each(['approve-label', 'fail-on-breaking'])('preserves the %s override', async override => {
       setInputs({
-        'annotation-level': 'failure',
+        'annotation-level': AnnotationFilterLevel.Breaking,
         [override]: override === 'approve-label' ? 'expected-breaking-change' : 'false',
       });
       if (override === 'approve-label') {
@@ -163,7 +163,10 @@ describe('Inspector Action', () => {
     });
 
     it('filters using the severity after applying rules', async () => {
-      setInputs({ 'annotation-level': 'failure', rules: 'example/rules/custom-rule.js' });
+      setInputs({
+        'annotation-level': AnnotationFilterLevel.Breaking,
+        rules: 'example/rules/custom-rule.js',
+      });
 
       await run();
 
@@ -180,7 +183,7 @@ describe('Inspector Action', () => {
       await run();
 
       expect(core.setFailed).toHaveBeenCalledWith(
-        'Invalid annotation-level. Expected one of: notice, warning, failure.',
+        'Invalid annotation-level. Expected one of: all, dangerous, breaking.',
       );
       expect(github.getOctokit).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();

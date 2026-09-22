@@ -75,13 +75,13 @@ Use annotation (`true` by default).
 
 ### `annotation-level`
 
-Minimum severity of inline annotations (`notice` by default).
+Minimum severity of inline annotations (`all` by default).
 
-| Value     | Inline annotations                                  |
-| --------- | --------------------------------------------------- |
-| `notice`  | All changes (breaking, dangerous, and non-breaking) |
-| `warning` | Breaking and dangerous changes                      |
-| `failure` | Breaking changes only                               |
+| Value       | Inline annotations                                  |
+| ----------- | --------------------------------------------------- |
+| `all`       | All changes (breaking, dangerous, and non-breaking) |
+| `dangerous` | Breaking and dangerous changes                      |
+| `breaking`  | Breaking changes only                               |
 
 To show only breaking changes inline:
 
@@ -89,7 +89,7 @@ To show only breaking changes inline:
 - uses: graphql-hive/graphql-inspector@master
   with:
     schema: 'master:schema.graphql'
-    annotation-level: failure
+    annotation-level: breaking
 ```
 
 The level applies after any configured `rules`. It only filters inline annotations: the check
